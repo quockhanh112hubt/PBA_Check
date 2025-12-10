@@ -5,7 +5,7 @@
 ### 1️⃣ **Main.spec** (đã cập nhật)
 - File cấu hình PyInstaller
 - Include tất cả dependencies và resources
-- Output: `PBA_Function_Checker.exe`
+- Output: `Main.exe`
 
 ### 2️⃣ **build_main.bat** ⭐ RECOMMENDED
 - Build script đầy đủ cho Windows
