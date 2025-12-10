@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import font, ttk, messagebox
-from log import log_message
+# from log import log_message
 from PIL import Image, ImageTk
 import cx_Oracle
 import pyodbc
@@ -270,9 +270,8 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
             'work_time': work_time
         })
         
-        # Giữ tối đa 10 records
-        if len(check_history) > 10:
-            check_history.pop()
+        # Không giới hạn số lượng records - lưu tất cả cho đến khi tắt chương trình
+        # Data sẽ được reset khi restart application
         
         # Update history display
         update_history_display()
@@ -288,8 +287,13 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
         if history_filter != "All":
             filtered_history = [item for item in check_history if item['result'] == history_filter]
         
+        # Chỉ hiển thị 200 records gần nhất để UI mượt mà
+        # Toàn bộ data vẫn được lưu trong check_history
+        display_limit = 200
+        displayed_history = filtered_history[:display_limit]
+        
         # Add history items
-        for item in filtered_history:
+        for item in displayed_history:
             if item['result'] == 'PASS':
                 result_icon = "✓"
             elif item['result'] == 'SKIP':
@@ -304,8 +308,18 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
                 item['result']
             ), tags=(item['result'].lower(),))
         
-        # Update filter label
-        filter_label.config(text=f"Filter: {history_filter}")
+        # Update filter label with total count info
+        total_count = len(check_history)
+        filtered_count = len(filtered_history)
+        if history_filter != "All":
+            filter_label.config(text=f"Filter: {history_filter} ({filtered_count}/{total_count} records)")
+        else:
+            filter_label.config(text=f"Filter: All ({total_count} records)")
+        
+        # Show warning if displaying limited results
+        if len(filtered_history) > display_limit:
+            filter_label.config(text=f"Filter: {history_filter} (Showing {display_limit}/{filtered_count} records)")
+
     
     def show_filter_menu(event):
         """Hiển thị menu filter khi click vào header Result"""
@@ -854,7 +868,7 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
     
     filter_hint_label = tk.Label(
         filter_control_frame,
-        text="💡 Click 'Result' column header to filter",
+        text="💡 Click 'Result' to filter",
         font=("Segoe UI", 8, "italic"),
         bg="white",
         fg="#9ca3af"
