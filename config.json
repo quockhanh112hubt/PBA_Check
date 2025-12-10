@@ -1,0 +1,26 @@
+{
+    "update": {
+        "program_directory": "C:\\PBA_CHECK",
+        "ftp_server": "192.168.110.12",
+        "ftp_username": "update",
+        "ftp_password": "update",
+        "update_path": "/KhanhDQ/Update_Program/PBA_CHECK/"
+    },
+    "database": {
+        "sql_server": {
+            "driver": "ODBC Driver 17 for SQL Server",
+            "server": "192.168.35.32",
+            "port": "1433",
+            "database": "ITMV_KTNG_DB",
+            "username": "ITMV_KTNG",
+            "password": "!itm@semi!12"
+        },
+        "oracle": {
+            "host": "192.168.35.20",
+            "port": "1521",
+            "service_name": "ITMVPACKMES",
+            "username": "mighty",
+            "password": "mighty"
+        }
+    }
+}

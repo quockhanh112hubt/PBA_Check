@@ -6,19 +6,15 @@ import cx_Oracle
 import pyodbc
 from datetime import datetime
 import threading
+from config_manager import get_sql_connection_string, get_oracle_connection_params, load_config, save_config
 
 
 def connect_to_database():
     """Kết nối đến SQL Server database"""
     conn = None
     try:
-        conn = pyodbc.connect(
-            'DRIVER={ODBC Driver 17 for SQL Server};'
-            'SERVER=192.168.35.32,1433;'
-            'DATABASE=ITMV_KTNG_DB;'
-            'UID=ITMV_KTNG;'
-            'PWD=!itm@semi!12;'
-        )
+        conn_string = get_sql_connection_string()
+        conn = pyodbc.connect(conn_string)
     except pyodbc.Error as e:
         print(f"Error connecting to SQL Server database: {e}")
     except Exception as e:
@@ -57,11 +53,8 @@ def execute_query_afa(conn, pba_id):
 def execute_query_oracle(pba_id):
     """Thực hiện query trên Oracle database"""
     try:
-        connection = cx_Oracle.connect(
-            user="mighty",
-            password="mighty",
-            dsn="(DESCRIPTION=(LOAD_BALANCE=yes)(ADDRESS=(PROTOCOL=TCP)(HOST=192.168.35.20)(PORT=1521))(ADDRESS=(PROTOCOL=TCP)(HOST=192.168.35.20)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ITMVPACKMES)(FAILOVER_MODE=(TYPE=SELECT)(METHOD=BASIC))))"
-        )
+        oracle_params = get_oracle_connection_params()
+        connection = cx_Oracle.connect(**oracle_params)
         
         query = """
                 SELECT NVL(MAX(A.TOTAL_JUDGMENT), 'SKIP') AS RESULT, 
@@ -440,11 +433,8 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
     def test_oracle_connection():
         """Test Oracle connection"""
         try:
-            connection = cx_Oracle.connect(
-                user="mighty",
-                password="mighty",
-                dsn="(DESCRIPTION=(LOAD_BALANCE=yes)(ADDRESS=(PROTOCOL=TCP)(HOST=192.168.35.20)(PORT=1521))(ADDRESS=(PROTOCOL=TCP)(HOST=192.168.35.20)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ITMVPACKMES)(FAILOVER_MODE=(TYPE=SELECT)(METHOD=BASIC))))"
-            )
+            oracle_params = get_oracle_connection_params()
+            connection = cx_Oracle.connect(**oracle_params)
             connection.close()
             return True
         except:
@@ -453,17 +443,231 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
     def test_sql_connection():
         """Test SQL Server connection"""
         try:
-            conn = pyodbc.connect(
-                'DRIVER={ODBC Driver 17 for SQL Server};'
-                'SERVER=192.168.35.32,1433;'
-                'DATABASE=ITMV_KTNG_DB;'
-                'UID=ITMV_KTNG;'
-                'PWD=!itm@semi!12;'
-            )
+            conn_string = get_sql_connection_string()
+            conn = pyodbc.connect(conn_string)
             conn.close()
             return True
         except:
             return False
+
+    def open_settings():
+        """Mở cửa sổ Settings"""
+        settings_window = tk.Toplevel(root_P1)
+        settings_window.title("⚙️ Settings - Configuration")
+        settings_window.geometry("700x650")
+        settings_window.configure(bg='#f5f7fa')
+        settings_window.resizable(False, False)
+        settings_window.grab_set()  # Modal window
+        
+        # Load current config
+        current_config = load_config()
+        
+        # Header
+        header = tk.Frame(settings_window, bg='#1e3a8a', height=60)
+        header.pack(fill='x')
+        header.pack_propagate(False)
+        
+        tk.Label(
+            header,
+            text="⚙️ SETTINGS",
+            font=("Segoe UI", 20, "bold"),
+            bg='#1e3a8a',
+            fg='white'
+        ).pack(pady=15)
+        
+        # Main content with scrollbar
+        main_frame = tk.Frame(settings_window, bg='#f5f7fa')
+        main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Canvas for scrolling
+        canvas = tk.Canvas(main_frame, bg='#f5f7fa', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg='#f5f7fa')
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # ===== UPDATE SETTINGS =====
+        update_frame = tk.LabelFrame(
+            scrollable_frame,
+            text="🔄 Update Configuration",
+            font=("Segoe UI", 11, "bold"),
+            bg='white',
+            fg='#1e3a8a',
+            padx=15,
+            pady=15
+        )
+        update_frame.pack(fill='x', pady=(0, 15))
+        
+        update_entries = {}
+        update_fields = [
+            ('program_directory', 'Program Directory:', current_config['update'].get('program_directory', 'C:\\PBA_CHECK')),
+            ('ftp_server', 'FTP Server IP:', current_config['update'].get('ftp_server', '192.168.110.12')),
+            ('ftp_username', 'FTP Username:', current_config['update'].get('ftp_username', 'update')),
+            ('ftp_password', 'FTP Password:', current_config['update'].get('ftp_password', 'update')),
+            ('update_path', 'Update Path:', current_config['update'].get('update_path', '/KhanhDQ/Update_Program/PBA_CHECK/'))
+        ]
+        
+        for idx, (key, label, value) in enumerate(update_fields):
+            tk.Label(update_frame, text=label, bg='white', font=("Segoe UI", 9)).grid(row=idx, column=0, sticky='w', pady=5)
+            entry = tk.Entry(update_frame, font=("Segoe UI", 9), width=50, show='*' if key == 'ftp_password' else '')
+            entry.insert(0, value)
+            entry.grid(row=idx, column=1, pady=5, padx=10)
+            update_entries[key] = entry
+        
+        # ===== SQL SERVER SETTINGS =====
+        sql_frame = tk.LabelFrame(
+            scrollable_frame,
+            text="🗄️ SQL Server Configuration",
+            font=("Segoe UI", 11, "bold"),
+            bg='white',
+            fg='#1e3a8a',
+            padx=15,
+            pady=15
+        )
+        sql_frame.pack(fill='x', pady=(0, 15))
+        
+        sql_entries = {}
+        sql_fields = [
+            ('driver', 'Driver:', current_config['database']['sql_server']['driver']),
+            ('server', 'Server:', current_config['database']['sql_server']['server']),
+            ('port', 'Port:', current_config['database']['sql_server']['port']),
+            ('database', 'Database:', current_config['database']['sql_server']['database']),
+            ('username', 'Username:', current_config['database']['sql_server']['username']),
+            ('password', 'Password:', current_config['database']['sql_server']['password'])
+        ]
+        
+        for idx, (key, label, value) in enumerate(sql_fields):
+            tk.Label(sql_frame, text=label, bg='white', font=("Segoe UI", 9)).grid(row=idx, column=0, sticky='w', pady=5)
+            entry = tk.Entry(sql_frame, font=("Segoe UI", 9), width=50, show='*' if key == 'password' else '')
+            entry.insert(0, value)
+            entry.grid(row=idx, column=1, pady=5, padx=10)
+            sql_entries[key] = entry
+        
+        # ===== ORACLE SETTINGS =====
+        oracle_frame = tk.LabelFrame(
+            scrollable_frame,
+            text="🗄️ Oracle Database Configuration",
+            font=("Segoe UI", 11, "bold"),
+            bg='white',
+            fg='#1e3a8a',
+            padx=15,
+            pady=15
+        )
+        oracle_frame.pack(fill='x', pady=(0, 15))
+        
+        oracle_entries = {}
+        oracle_fields = [
+            ('host', 'Host:', current_config['database']['oracle']['host']),
+            ('port', 'Port:', current_config['database']['oracle']['port']),
+            ('service_name', 'Service Name:', current_config['database']['oracle']['service_name']),
+            ('username', 'Username:', current_config['database']['oracle']['username']),
+            ('password', 'Password:', current_config['database']['oracle']['password'])
+        ]
+        
+        for idx, (key, label, value) in enumerate(oracle_fields):
+            tk.Label(oracle_frame, text=label, bg='white', font=("Segoe UI", 9)).grid(row=idx, column=0, sticky='w', pady=5)
+            entry = tk.Entry(oracle_frame, font=("Segoe UI", 9), width=50, show='*' if key == 'password' else '')
+            entry.insert(0, value)
+            entry.grid(row=idx, column=1, pady=5, padx=10)
+            oracle_entries[key] = entry
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # ===== BUTTONS =====
+        button_frame = tk.Frame(settings_window, bg='#f5f7fa')
+        button_frame.pack(fill='x', padx=20, pady=(0, 20))
+        
+        def save_settings():
+            """Save settings to config.json"""
+            try:
+                new_config = {
+                    "update": {
+                        "program_directory": update_entries['program_directory'].get(),
+                        "ftp_server": update_entries['ftp_server'].get(),
+                        "ftp_username": update_entries['ftp_username'].get(),
+                        "ftp_password": update_entries['ftp_password'].get(),
+                        "update_path": update_entries['update_path'].get()
+                    },
+                    "database": {
+                        "sql_server": {
+                            "driver": sql_entries['driver'].get(),
+                            "server": sql_entries['server'].get(),
+                            "port": sql_entries['port'].get(),
+                            "database": sql_entries['database'].get(),
+                            "username": sql_entries['username'].get(),
+                            "password": sql_entries['password'].get()
+                        },
+                        "oracle": {
+                            "host": oracle_entries['host'].get(),
+                            "port": oracle_entries['port'].get(),
+                            "service_name": oracle_entries['service_name'].get(),
+                            "username": oracle_entries['username'].get(),
+                            "password": oracle_entries['password'].get()
+                        }
+                    }
+                }
+                
+                if save_config(new_config):
+                    messagebox.showinfo("Success", "✓ Settings saved successfully!\n\nPlease restart the application for changes to take effect.")
+                    settings_window.destroy()
+                else:
+                    messagebox.showerror("Error", "Failed to save settings!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error saving settings: {str(e)}")
+        
+        def reset_to_default():
+            """Reset to default configuration"""
+            from config_manager import DEFAULT_CONFIG
+            if messagebox.askyesno("Confirm", "Are you sure you want to reset all settings to default?"):
+                if save_config(DEFAULT_CONFIG):
+                    messagebox.showinfo("Success", "✓ Settings reset to default!\n\nPlease restart the application.")
+                    settings_window.destroy()
+        
+        tk.Button(
+            button_frame,
+            text="💾 Save Settings",
+            command=save_settings,
+            bg='#10b981',
+            fg='white',
+            font=("Segoe UI", 10, "bold"),
+            relief='flat',
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        ).pack(side='left', padx=5)
+        
+        tk.Button(
+            button_frame,
+            text="🔄 Reset to Default",
+            command=reset_to_default,
+            bg='#f59e0b',
+            fg='white',
+            font=("Segoe UI", 10, "bold"),
+            relief='flat',
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        ).pack(side='left', padx=5)
+        
+        tk.Button(
+            button_frame,
+            text="❌ Cancel",
+            command=settings_window.destroy,
+            bg='#6b7280',
+            fg='white',
+            font=("Segoe UI", 10, "bold"),
+            relief='flat',
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        ).pack(side='right', padx=5)
 
     # ==================== MAIN WINDOW ====================
     root_P1 = tk.Tk()
@@ -499,6 +703,7 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
     
     tools_menu = tk.Menu(menubar, tearoff=0)
     tools_menu.add_command(label="🔄 Check Connections", command=check_connections)
+    tools_menu.add_command(label="⚙️ Settings", command=open_settings)
     menubar.add_cascade(label="Tools", menu=tools_menu)
     
     root_P1.config(menu=menubar)
@@ -942,7 +1147,7 @@ def create_gui_P1(create_login_ui, create_gui_P230, create_gui_P4):
     
     copyright_label = tk.Label(
         footer_frame,
-        text="© 2024 ITM Semiconductor Vietnam - IT Team | All Rights Reserved",
+        text="© 2025 ITM Semiconductor Vietnam - IT Team - KhanhIT | All Rights Reserved",
         font=("Segoe UI", 9),
         bg="#f5f7fa",
         fg="#6b7280"
